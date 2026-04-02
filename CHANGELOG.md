@@ -1,4 +1,4 @@
-# Basecamp Changelog
+# AI Basecamp Changelog
 
 ## v0.1 (2026-04-01)
 

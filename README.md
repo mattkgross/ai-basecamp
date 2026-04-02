@@ -1,4 +1,4 @@
-# Basecamp
+# AI Basecamp
 
 An AI-first project template for solo builders. Start here, build anything.
 

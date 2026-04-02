@@ -1,4 +1,4 @@
-# Basecamp — How to Use This Template
+# AI Basecamp — How to Use This Template
 
 ## Quick Start
 
