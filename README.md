@@ -1,6 +1,6 @@
-# Project Name
+# Basecamp
 
-<!-- One-line description of what this project does -->
+An AI-first project template for solo builders. Start here, build anything.
 
 ## Quick Start
 

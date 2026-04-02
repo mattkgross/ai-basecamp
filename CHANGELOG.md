@@ -1,4 +1,4 @@
-# Template Changelog
+# Basecamp Changelog
 
 ## v0.1 (2026-04-01)
 
