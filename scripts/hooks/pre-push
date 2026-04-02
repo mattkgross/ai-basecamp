@@ -1,0 +1,42 @@
+#!/bin/bash
+# Pre-push hook: build check, doc-drift detection
+# Install: cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+set -e
+
+echo "🔍 Running pre-push checks..."
+
+# --- Build Check ---
+# TODO: Add project-specific build command here
+# Examples:
+#   npm run build
+#   dotnet build
+#   cargo build
+
+# --- Doc Drift Detection ---
+echo "  📄 Checking for doc drift..."
+
+# Get list of changed files compared to remote
+CHANGED_FILES=$(git diff --name-only @{push}.. 2>/dev/null || git diff --name-only HEAD~1)
+
+# Check if source code changed without related doc updates
+# Customize these mappings for your project
+DOC_DRIFT=false
+
+# Example: if src/ changed but ARCHITECTURE.md didn't
+if echo "$CHANGED_FILES" | grep -q "^src/" && ! echo "$CHANGED_FILES" | grep -qE "(ARCHITECTURE\.md|docs/|README\.md)"; then
+    echo "  ⚠️  Source code changed but no docs were updated."
+    echo "     Changed source files:"
+    echo "$CHANGED_FILES" | grep "^src/" | sed 's/^/       /'
+    echo "     Consider updating: ARCHITECTURE.md, PATTERNS.md, or relevant spec"
+    DOC_DRIFT=true
+fi
+
+if [ "$DOC_DRIFT" = true ]; then
+    echo "  📝 Doc drift detected — this is a warning, not a block."
+    echo "     If docs don't need updating, proceed. If they do, update them first."
+    # NOTE: This is a warning, not a hard block. Change 'exit 0' to 'exit 1' 
+    # if you want to enforce doc updates on every push.
+fi
+
+echo "✅ Pre-push checks passed"

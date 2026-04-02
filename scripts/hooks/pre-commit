@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pre-commit hook: lint, format, secret detection
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# --- Secret Detection ---
+# Requires: gitleaks (https://github.com/gitleaks/gitleaks)
+if command -v gitleaks &> /dev/null; then
+    echo "  🔑 Checking for secrets..."
+    gitleaks git --pre-commit --staged --no-banner -q
+    if [ $? -ne 0 ]; then
+        echo "  ❌ Secrets detected! Remove them before committing."
+        exit 1
+    fi
+    echo "  ✅ No secrets found"
+else
+    echo "  ⚠️  gitleaks not installed — skipping secret detection"
+    echo "     Install: https://github.com/gitleaks/gitleaks#installing"
+fi
+
+# --- Lint & Format ---
+# TODO: Add project-specific lint/format commands here
+# Examples:
+#   npm run lint
+#   dotnet format --verify-no-changes
+#   cargo fmt --check
+
+echo "✅ Pre-commit checks passed"

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+vendor/
+packages/
+
+# Build output
+dist/
+build/
+bin/
+obj/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+*.lcov
+
+# Secrets (belt and suspenders — gitleaks catches these too)
+*.pem
+*.key
+*.p12
+*.pfx
