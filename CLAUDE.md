@@ -25,6 +25,8 @@ ARCHITECTURE.md          ← System map, component boundaries, tech decisions
 docs/
   PATTERNS.md            ← Code patterns, conventions, lessons learned
   specs/                 ← Feature specifications + acceptance criteria
+  exec-plans/            ← Module plans: planned → active → completed → debt
+    PLANNING.md          ← Module decomposition methodology
 ```
 
 ## What Goes Where
