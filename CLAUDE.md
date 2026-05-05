@@ -37,3 +37,16 @@ docs/
 | ARCHITECTURE.md | System structure, components, data flow, tech decisions + rationale, scaling levers | Code patterns, agent instructions |
 | PATTERNS.md | How we do things in this codebase, conventions, anti-patterns, lessons from bugs | Architecture decisions, system structure |
 | Feature specs | What to build, acceptance criteria, test cases, explicit exclusions | How to build it (that's your job) |
+
+## Harness invariants
+
+Mechanically enforced — `scripts/lint-docs.sh` runs at session start and on `/harness-check`.
+
+1. **Plans are artifacts.** Active work gets a plan in `docs/exec-plans/active/`. Move to `docs/exec-plans/completed/` when done, `docs/exec-plans/debt/` for known shortcuts.
+2. **Decisions are tracked.** Every 🚧 or ⏳ in docs/ must have a matching entry in `docs/decisions/OPEN.md`. Significant choices get their own record in `docs/decisions/NNNN-slug.md`.
+3. **Cross-refs resolve.** Every file reference in any .md must point to a file that exists.
+4. **Docs stay lean.** AGENTS.md and CLAUDE.md under 100 lines each.
+
+## Quality gates
+
+Pre-code: doc completeness, cross-ref integrity, decision record for arch choices. Post-code: tests ship with code, lint passes, reviewer agent approves.

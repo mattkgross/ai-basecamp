@@ -4,10 +4,11 @@
 
 1. Copy this template into a new repo (or use GitHub's "Use this template" feature)
 2. Run `./scripts/setup.sh` to install git hooks
-3. Replace `ARCHITECTURE.md` with your actual system design
-4. Customize `CLAUDE.md` with project-specific agent rules
-5. Add lint/format/build commands to the hook scripts and CI workflow
-6. Start building
+3. Run `/harness-bootstrap` to scaffold the harness structure (exec-plans, decisions, patterns, lint script)
+4. Replace `ARCHITECTURE.md` with your actual system design
+5. Customize `CLAUDE.md` with project-specific agent rules and harness invariants
+6. Add lint/format/build commands to the hook scripts and CI workflow
+7. Start building
 
 ## What's Included (Tier 1)
 
@@ -32,16 +33,16 @@ scripts/
 ## What to Customize
 
 - **Hook scripts:** Add your lint/format/build commands (marked with TODO)
-- **CI workflow:** Add a `.github/workflows/ci.yml` for your stack
+- **CI workflow:** Add a ".github/workflows/ci.yml" for your stack
 - **Doc-drift mappings:** Update `pre-push` hook with your source→doc mappings
 - **.gitignore:** Add stack-specific ignores
 
 ## Tier 2 (Add When Growing)
 
 When the project has real users and revenue, consider adding:
-- Security reviewer (`.github/review-agents/security-reviewer.md`)
-- Architecture reviewer (`.github/review-agents/architecture-reviewer.md`)
-- Auto-fix pipeline (`.github/workflows/auto-fix.yml`)
+- Security reviewer (".github/review-agents/security-reviewer.md")
+- Architecture reviewer (".github/review-agents/architecture-reviewer.md")
+- Auto-fix pipeline (".github/workflows/auto-fix.yml")
 - LESSONS.md, DECISIONS.md, module READMEs
 - Layer 3 adversarial testing in CI
 

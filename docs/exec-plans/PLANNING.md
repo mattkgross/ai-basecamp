@@ -64,7 +64,7 @@ Build order follows the dependency graph:
 
 ## Module Outline Format
 
-Each module lives in `docs/exec-plans/planned/module-NN-slug.md`. The outline is intentionally lightweight — detailed plans are written JIT when the module enters active development.
+Each module lives in "docs/exec-plans/planned/module-NN-slug.md". The outline is intentionally lightweight — detailed plans are written JIT when the module enters active development.
 
 ```markdown
 # Module NN: [Name]

@@ -16,11 +16,11 @@ This document describes two tiers. Start with Tier 1 for every project. Graduate
 - **Testing:** Layer 1 (spec-driven) + Layer 2 (implementation). No adversarial pass yet.
 - **Bug process:** Fix and move on. No formal post-mortems. BUGS.md parking lot if needed.
 - **Monitoring:** Uptime check + Sentry. That's it.
-- **Hooks:** Pre-commit (lint, format, secrets). Pre-push (build, doc-drift file check, pattern reviewer via `.claude/agents/`). Local agents are the primary enforcement layer.
+- **Hooks:** Pre-commit (lint, format, secrets). Pre-push (build, doc-drift file check, pattern reviewer via `.agents/skills/`). Local agents are the primary enforcement layer.
 
 ### Tier 2: Growth / Real Users (Graduate When Ready) 🔶
 - All Tier 1, plus:
-- **Additional `.claude/agents/`:** Security reviewer (when user accounts exist), architecture reviewer (when codebase is large enough for boundary violations)
+- **Additional `.agents/skills/`:** Security reviewer (when user accounts exist), architecture reviewer (when codebase is large enough for boundary violations)
 - **CI-based review agents** (`.github/review-agents/`) mirroring local agents on PRs
 - **Layer 3 adversarial testing** on PRs
 - **Mandatory post-mortems** with three outputs (fix, explanation, process change)
@@ -156,14 +156,14 @@ This document describes two tiers. Start with Tier 1 for every project. Graduate
 
 **Tier 1 scaffolding includes:** 🟢
 - Repo structure, CLAUDE.md, ARCHITECTURE.md, PATTERNS.md skeleton
-- `.claude/agents/` directory with pattern reviewer agent (local, invokable from Claude Code and hooks)
+- `.agents/skills/` directory with pattern reviewer agent (local, invokable from Claude Code and hooks)
 - Pre-commit hooks (lint, format, secret detection)
 - Pre-push hooks (build check, doc-drift file check, pattern reviewer invocation)
 - Basic CI (build, test, lint)
 - Entire.io integration
 
 **Tier 2 adds:** 🔶
-- Additional `.claude/agents/` (security reviewer, architecture reviewer)
+- Additional `.agents/skills/` (security reviewer, architecture reviewer)
 - CI-based review agents (`.github/review-agents/`) for PR automation
 - Layer 3 adversarial test action
 - Auto-fix pipeline workflow
@@ -251,7 +251,7 @@ This document describes two tiers. Start with Tier 1 for every project. Graduate
 
 Review agents exist at two layers, each with different trigger points and contexts:
 
-**Layer A: Local Claude Code Agents (`.claude/agents/`)** 🟢
+**Layer A: Local Claude Code Agents (`.agents/skills/`)** 🟢
 - Markdown files defining specialized agents that Claude Code invokes directly
 - Triggered locally via hooks (pre-push) or manually during interactive sessions
 - Fast feedback loop — runs before code leaves the working tree
@@ -272,7 +272,7 @@ Review agents exist at two layers, each with different trigger points and contex
 | **Architecture reviewer** | Boundaries, dependency direction, structural compliance | Diff + ARCHITECTURE.md | 🔶 when codebase is large enough | 🔶 |
 | **Doc drift checker** | Were relevant docs updated | File diff only (no LLM) | 🟢 day one (hook, zero tokens) | 🟢 (CI, zero tokens) |
 
-**Single source of truth:** `.claude/agents/` is the canonical definition for every review agent. CI agents (`.github/review-agents/`) must derive from these — never maintain independent copies. The template repo includes a CI helper that reads agent definitions from `.claude/agents/` at runtime, so updating the prompt in one place updates both layers. If a CI agent needs additional CI-specific wrapping (e.g., PR comment formatting), that wrapping lives in the workflow YAML, not in a duplicated agent file.
+**Single source of truth:** `.agents/skills/` is the canonical definition for every review agent. CI agents (`.github/review-agents/`) must derive from these — never maintain independent copies. The template repo includes a CI helper that reads agent definitions from `.agents/skills/` at runtime, so updating the prompt in one place updates both layers. If a CI agent needs additional CI-specific wrapping (e.g., PR comment formatting), that wrapping lives in the workflow YAML, not in a duplicated agent file.
 
 ### Human Review (Matt) 🟢:
 - Not line-by-line correctness — agents and tests cover that.
@@ -285,8 +285,8 @@ Review agents exist at two layers, each with different trigger points and contex
 - Default is blocked, not "hope Matt reads it"
 
 ### Agent Config:
-- **Canonical definitions:** `.claude/agents/` — version-controlled, each a markdown file with persona + instructions + tool constraints. Single source of truth for both local and CI execution.
-- **CI execution (Tier 2):** Workflow YAML reads agent prompts from `.claude/agents/` at runtime. No duplicated `.github/review-agents/` directory. CI-specific wrapping (PR comment formatting, label application, severity parsing) lives in the workflow, not the agent definition.
+- **Canonical definitions:** `.agents/skills/` — version-controlled, each a markdown file with persona + instructions + tool constraints. Single source of truth for both local and CI execution.
+- **CI execution (Tier 2):** Workflow YAML reads agent prompts from `.agents/skills/` at runtime. No duplicated `.github/review-agents/` directory. CI-specific wrapping (PR comment formatting, label application, severity parsing) lives in the workflow, not the agent definition.
 - Each agent gets narrow context (its docs + diff only), not everything
 - Can run in parallel — no wall-clock increase
 
@@ -306,7 +306,7 @@ Local (pre-push hooks):
   → Lint + format (pre-commit already caught most)
   → Build check
   → Doc-drift file check (zero tokens)
-  → Pattern reviewer via .claude/agents/ (LLM tokens, local)
+  → Pattern reviewer via .agents/skills/ (LLM tokens, local)
 
 CI (on PR):
   → Build
@@ -319,11 +319,11 @@ CI (on PR):
 
 ### Tier 2 Pipeline (adds): 🔶
 ```
-Local (.claude/agents/ additions):
+Local (.agents/skills/ additions):
   → Security reviewer (pre-push)
   → Architecture reviewer (pre-push)
 
-CI (additions, all reading from .claude/agents/):
+CI (additions, all reading from .agents/skills/):
   → Pattern reviewer (catches skipped hooks)
   → Security reviewer
   → Architecture reviewer
@@ -520,7 +520,7 @@ Discovery
 **Hooks + Local Agents (daily, real-time): 🟢**
 - Run on every commit/push/PR
 - Pre-commit: lint, format, secret detection (zero tokens)
-- Pre-push: build check, doc-drift file check (zero tokens), then invoke `.claude/agents/` reviewers against staged changes (LLM tokens)
+- Pre-push: build check, doc-drift file check (zero tokens), then invoke `.agents/skills/` reviewers against staged changes (LLM tokens)
 - Agents read from: PATTERNS.md, CLAUDE.md, ARCHITECTURE.md (each scoped to its own docs)
 - Enforce: patterns followed, docs updated, boundaries respected, tests included
 - This is the backbone. No human willpower needed.
@@ -595,7 +595,7 @@ project-template/
   .github/
     workflows/
       auto-fix.yml              ← Automated bug fix pipeline
-      review.yml                ← CI review: reads agents from .claude/agents/ (no duplicated prompts)
+      review.yml                ← CI review: reads agents from .agents/skills/ (no duplicated prompts)
     templates/
       ISSUE_TEMPLATE/
         bug.md
@@ -605,7 +605,7 @@ project-template/
     DECISIONS.md
 ```
 
-**Note:** No `.github/review-agents/` directory. CI workflows read agent definitions directly from `.claude/agents/` — one prompt, two execution contexts. CI-specific behavior (PR comments, labels, severity formatting) is handled in the workflow YAML itself.
+**Note:** No `.github/review-agents/` directory. CI workflows read agent definitions directly from `.agents/skills/` — one prompt, two execution contexts. CI-specific behavior (PR comments, labels, severity formatting) is handled in the workflow YAML itself.
 
 ### Feedback Loop:
 - **Project 1** (template v0.1) → Learn, fix in project + template
@@ -617,7 +617,7 @@ project-template/
 - Every process learning: "Would I want this on day one of the next project?" → If yes, update template.
 - Template has its own CHANGELOG.md tracking evolution.
 - **Potential open-source product** once battle-tested across 2-3 projects.
-- **Agent definitions are single-source:** `.claude/agents/` is canonical. CI workflows read from `.claude/agents/` at runtime — no duplicated prompt files in `.github/review-agents/`. CI-specific behavior (comment format, label application) lives in workflow YAML, not in agent definitions.
+- **Agent definitions are single-source:** `.agents/skills/` is canonical. CI workflows read from `.agents/skills/` at runtime — no duplicated prompt files in `.github/review-agents/`. CI-specific behavior (comment format, label application) lives in workflow YAML, not in agent definitions.
 
 ---
 

@@ -28,6 +28,13 @@ This project follows an AI-first development workflow. See [CLAUDE.md](CLAUDE.md
 - **[docs/PATTERNS.md](docs/PATTERNS.md)** — Code conventions + lessons learned
 - **[docs/specs/](docs/specs/)** — Feature specifications
 
+### Commands
+
+| Command | What it does |
+|---------|-------------|
+| `/harness-bootstrap` | Scaffold a new project's harness structure, or audit an existing one. |
+| `/harness-check` | Run full doc validation — cross-refs, decision sync, file lengths. |
+
 ### Git hooks
 
 Installed automatically via `./scripts/setup.sh`:
