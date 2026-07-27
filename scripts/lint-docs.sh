@@ -147,9 +147,9 @@ for arg in "$@"; do
   esac
 done
 
-# Recursive scans use `git grep` / `git ls-files` so .gitignore is honored for
-# free (no build-output exclude lists to maintain) and BSD/macOS grep quirks stop
-# mattering. Both require a git working tree.
+# Recursive scans go through git rather than find/grep so .gitignore is honored
+# for free (no build-output exclude lists to maintain) and BSD/macOS grep quirks
+# stop mattering. This requires a git working tree.
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "✗ lint-docs.sh must run inside a git repository" >&2
   exit 1
@@ -169,6 +169,17 @@ HISTORICAL_EXCLUDES=(
   ':!docs/exec-plans/debt/*'
   ':!docs/exec-plans/planned/*'
 )
+
+# Both git grep and git ls-files see only TRACKED files by default. That makes a
+# brand-new doc invisible to every check until it is committed: the author writes
+# it, runs the lint, gets green, commits, and CI fails on a broken reference that
+# was fixable in place seconds earlier. Worse, the green run actively misleads —
+# it reads as "this file is fine" rather than "this file was not examined."
+#
+# Both wrappers therefore include untracked files. .gitignore is still honored
+# (git's standard excludes apply), so build output and dependencies stay out.
+git_grep_docs() { git grep --untracked "$@"; }
+ls_docs() { git ls-files --cached --others --exclude-standard "$@"; }
 
 PASS=0
 WARN=0
@@ -281,7 +292,7 @@ if $BUDGET; then
   fi
   echo ""
   echo "  Largest reachable docs (excludes historical plans, research, legal):"
-  git ls-files "${DOC_GLOBS[@]}" \
+  ls_docs "${DOC_GLOBS[@]}" \
     "${HISTORICAL_EXCLUDES[@]}" ':!docs/research/*' ':!docs/legal/*' \
     2>/dev/null | xargs -I{} wc -c {} 2>/dev/null |
     sort -rn | head -8 |
@@ -382,7 +393,7 @@ while IFS= read -r line; do
     fail "Broken link in $file → $path"
     XREF_ERRORS=$((XREF_ERRORS + 1))
   fi
-done < <(git grep -nE '\]\([^)]+\)' -- '*.md' "${HISTORICAL_EXCLUDES[@]}" "${XREF_EXCLUDE_PATHS[@]}" 2>/dev/null || true)
+done < <(git_grep_docs -nE '\]\([^)]+\)' -- '*.md' "${HISTORICAL_EXCLUDES[@]}" "${XREF_EXCLUDE_PATHS[@]}" 2>/dev/null || true)
 
 # 3b — Backticked paths that look canonical. Loop over EVERY match on the line,
 # not just the first: a single sentence often names two paths, and checking only
@@ -413,7 +424,7 @@ while IFS= read -r line; do
       XREF_ERRORS=$((XREF_ERRORS + 1))
     fi
   done < <(echo "$line" | grep -oE "\`($XREF_PREFIXES)[^\`]+\`" || true)
-done < <(git grep -nE "\`($XREF_PREFIXES)[^\`]+\`" -- '*.md' "${HISTORICAL_EXCLUDES[@]}" "${XREF_EXCLUDE_PATHS[@]}" 2>/dev/null || true)
+done < <(git_grep_docs -nE "\`($XREF_PREFIXES)[^\`]+\`" -- '*.md' "${HISTORICAL_EXCLUDES[@]}" "${XREF_EXCLUDE_PATHS[@]}" 2>/dev/null || true)
 
 # 3c — Source-path references inside source files. Real imports go through the
 # build system's resolution, so a literal source path in a source file is almost
@@ -432,7 +443,7 @@ if [[ -d "$SOURCE_DIR" ]]; then
         XREF_ERRORS=$((XREF_ERRORS + 1))
       fi
     done < <(echo "$content" | grep -oE "$SOURCE_DIR/[a-zA-Z0-9_./-]+\.($SOURCE_EXTENSIONS)" || true)
-  done < <(git grep -nE "$SOURCE_DIR/[a-zA-Z0-9_./-]+\.($SOURCE_EXTENSIONS)" -- "$SOURCE_DIR/*" 2>/dev/null || true)
+  done < <(git_grep_docs -nE "$SOURCE_DIR/[a-zA-Z0-9_./-]+\.($SOURCE_EXTENSIONS)" -- "$SOURCE_DIR/*" 2>/dev/null || true)
 fi
 
 if [[ $XREF_ERRORS -eq 0 ]]; then
@@ -462,7 +473,7 @@ if [[ -f "$OPEN_DECISIONS_FILE" ]]; then
       warn "🚧/⏳ in $file may not be tracked in $OPEN_DECISIONS_FILE"
       MISSING_DECISIONS=$((MISSING_DECISIONS + 1))
     fi
-  done < <(git grep -nE '🚧|⏳' -- "${DOC_GLOBS[@]}" "${HISTORICAL_EXCLUDES[@]}" 2>/dev/null || true)
+  done < <(git_grep_docs -nE '🚧|⏳' -- "${DOC_GLOBS[@]}" "${HISTORICAL_EXCLUDES[@]}" 2>/dev/null || true)
   if [[ $MISSING_DECISIONS -eq 0 ]]; then
     pass "All 🚧/⏳ markers tracked in $OPEN_DECISIONS_FILE"
   fi
@@ -513,10 +524,10 @@ $QUIET || echo "== Decision-record number uniqueness =="
 DUPLICATE_ADRS=0
 while IFS= read -r dup; do
   [[ -z "$dup" ]] && continue
-  files=$(git ls-files "docs/decisions/${dup}-*.md" | sed -E 's|.*/||' | tr '\n' ' ')
+  files=$(ls_docs "docs/decisions/${dup}-*.md" | sed -E 's|.*/||' | tr '\n' ' ')
   fail "Decision-record number ${dup} is used by more than one file: ${files}— renumber the newer one to the next free number"
   DUPLICATE_ADRS=$((DUPLICATE_ADRS + 1))
-done < <(git ls-files 'docs/decisions/*.md' 2>/dev/null |
+done < <(ls_docs 'docs/decisions/*.md' 2>/dev/null |
   sed -E 's|.*/||' | grep -oE '^[0-9]{4}-' | tr -d '-' |
   sort | uniq -d)
 if [[ $DUPLICATE_ADRS -eq 0 ]]; then
@@ -566,7 +577,7 @@ while IFS= read -r f; do
     warn "$f is $doc_bytes bytes / ~$((doc_bytes / 4)) tokens (soft byte cap: $DOC_BYTE_CAP) — long-line bloat the line cap cannot see"
     LENGTH_OVER=$((LENGTH_OVER + 1))
   fi
-done < <(git ls-files "${DOC_GLOBS[@]}" \
+done < <(ls_docs "${DOC_GLOBS[@]}" \
   "${HISTORICAL_EXCLUDES[@]}" ':!docs/exec-plans/active/*' \
   ':!docs/research/*' ':!docs/legal/*' ':!docs/decisions/0*-*.md' \
   2>/dev/null || true)
@@ -578,7 +589,7 @@ fi
 $QUIET || echo "== Content violations =="
 VIOLATIONS=0
 for pattern in ${DENY_PATTERNS[@]+"${DENY_PATTERNS[@]}"}; do
-  if git grep -qiE "$pattern" -- "${DOC_GLOBS[@]}" "${DENY_EXCLUDE_PATHS[@]}" 2>/dev/null; then
+  if git_grep_docs -qiE "$pattern" -- "${DOC_GLOBS[@]}" "${DENY_EXCLUDE_PATHS[@]}" 2>/dev/null; then
     fail "Content violation: '$pattern' found in docs/"
     VIOLATIONS=$((VIOLATIONS + 1))
   fi
@@ -602,7 +613,7 @@ if [[ -n "$BANNED_AUTO_COMMANDS" ]]; then
       BANNED_FOUND=$((BANNED_FOUND + 1))
       # Filter non-execution contexts: echoed strings, workflow annotations,
       # comment lines, and metadata value fields.
-    done < <(git grep -nE "($BANNED_AUTO_COMMANDS)" -- '.github/workflows/*.yml' '.github/workflows/*.yaml' 2>/dev/null |
+    done < <(git_grep_docs -nE "($BANNED_AUTO_COMMANDS)" -- '.github/workflows/*.yml' '.github/workflows/*.yaml' 2>/dev/null |
       grep -vE '(echo|::error|::warning|::notice|^[^:]+:[0-9]+:[[:space:]]*#|name:|with:|description:)' || true)
   fi
   for manifest in "${BANNED_AUTO_SCRIPT_FILES[@]}"; do
@@ -624,7 +635,7 @@ DEAD_NAMES=0
 for i in ${DEAD_NAME_PATTERNS[@]+"${!DEAD_NAME_PATTERNS[@]}"}; do
   pattern="${DEAD_NAME_PATTERNS[$i]}"
   desc="${DEAD_NAME_DESCS[$i]:-stale name}"
-  matches=$(git grep -nE "$pattern" -- "${DOC_GLOBS[@]}" 2>/dev/null || true)
+  matches=$(git_grep_docs -nE "$pattern" -- "${DOC_GLOBS[@]}" 2>/dev/null || true)
   if [[ -n "$matches" ]]; then
     while IFS= read -r match; do
       [[ -z "$match" ]] && continue
@@ -653,7 +664,7 @@ if [[ -f "$AGENTS_FILE" ]]; then
       warn "$f not referenced in $AGENTS_FILE § Where to look"
       INDEX_GAPS=$((INDEX_GAPS + 1))
     fi
-  done < <(git ls-files 'docs/*.md' 2>/dev/null | awk -F/ 'NF==2' || true)
+  done < <(ls_docs 'docs/*.md' 2>/dev/null | awk -F/ 'NF==2' || true)
 
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
@@ -661,7 +672,7 @@ if [[ -f "$AGENTS_FILE" ]]; then
       warn "$f (split-doc index) not referenced in $AGENTS_FILE § Where to look"
       INDEX_GAPS=$((INDEX_GAPS + 1))
     fi
-  done < <(git ls-files 'docs/*/README.md' "${HISTORICAL_EXCLUDES[@]}" 2>/dev/null | awk -F/ 'NF==3' || true)
+  done < <(ls_docs 'docs/*/README.md' "${HISTORICAL_EXCLUDES[@]}" 2>/dev/null | awk -F/ 'NF==3' || true)
 fi
 if [[ $INDEX_GAPS -eq 0 ]]; then
   pass "All root docs and split-doc indexes are reachable from $AGENTS_FILE"
@@ -684,7 +695,7 @@ while IFS= read -r f; do
     warn "$f missing '## What actually shipped' — see docs/exec-plans/PLANNING.md § The retrospective (or mark it '<!-- no-retrospective: reason -->' if it is a supporting artifact)"
     MISSING_RETROS=$((MISSING_RETROS + 1))
   fi
-done < <(git ls-files 'docs/exec-plans/completed/*.md' 2>/dev/null || true)
+done < <(ls_docs 'docs/exec-plans/completed/*.md' 2>/dev/null || true)
 if [[ $MISSING_RETROS -eq 0 ]]; then
   pass "All completed plans carry a retrospective"
 fi
@@ -701,7 +712,7 @@ if [[ -d "$SOURCE_DIR" ]]; then
   done
   # Co-located tests are equally valid — only conclude "no suite" if neither
   # shape is present.
-  if ! $found_tests && git ls-files "$SOURCE_DIR/*" 2>/dev/null | grep -qiE '(\.|_|-)(test|spec)\.'; then
+  if ! $found_tests && ls_docs "$SOURCE_DIR/*" 2>/dev/null | grep -qiE '(\.|_|-)(test|spec)\.'; then
     found_tests=true
   fi
   if $found_tests; then

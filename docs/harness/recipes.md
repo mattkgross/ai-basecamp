@@ -189,7 +189,7 @@ done < <(git grep -nE 'pnpm[^|]*exec' -- '.github/workflows/*.yml' '*.sh' 'packa
 
 **Applies to:** projects whose docs cross-reference specific sections and that periodically move content between a live doc and an archive.
 
-**The failure:** a reference like `` `docs/DESIGN.md` § Module 30 `` has two halves. Path checking validates the file and strips the section, so the section half can rot indefinitely. In the source project nine such pointers broke across two archive sweeps — six of them naming a section that by then existed in neither the live document nor any archive. Nothing failed. Nothing warned.
+**The failure:** a reference of the form *path* § *Section name* has two halves. Path checking validates the file and strips the section, so the section half can rot indefinitely. In the source project nine such pointers broke across two archive sweeps — six of them naming a section that by then existed in neither the live document nor any archive. Nothing failed. Nothing warned.
 
 **Measure before enabling this repo-wide.** A repo-wide version was built and measured in the source project first: **44% of roughly 600 section references named a bold lead-in or a numbered sub-item rather than an actual heading.** At that rate the check cannot distinguish drift from house style, and the noise buries the signal.
 

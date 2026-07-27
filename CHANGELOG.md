@@ -20,6 +20,7 @@ Rebuilt from the harness of a production project, porting the mechanics that ear
 - Decision-record number uniqueness. Two branches taking "the next number" collide silently — differing slugs mean no merge conflict, and both files existing means every other check passes.
 - Decision-tracker hygiene: pending-only, enforced. Closing a row in place is the mechanism by which the tracker bloats.
 - Hardened cross-references: every match on a line rather than only the first; source-path references inside source files; skips for globs, brace expansion, placeholders, and command strings; resolution of the trailing `:NNN` line-number convention.
+- **Scans now include untracked files.** `git grep` and `git ls-files` default to tracked files only, so a brand-new doc passed every check until it was committed — and the green run read as "fine" rather than "not examined". Found by planting a broken reference in an untracked file; standard excludes still keep build output out.
 - Agent-guide aliasing check — warn-only, because Windows checkouts cannot always create symlinks.
 - Retrospective check with an inline opt-out marker rather than a filename heuristic.
 - **All tunable knobs hoisted into one CONFIG block.** The source project scattered them beside their checks across 1300 lines; a fork should edit one block, not read the whole file.

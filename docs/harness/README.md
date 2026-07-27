@@ -57,6 +57,14 @@ Run the full suite with `/harness-check` or `bash scripts/lint-docs.sh`. Every k
 
 This lesson recurs, which is why it appears in three checks. A line cap is blind to long-line bloat: a doc that packs each entry into one dense line reads green at 150 lines while costing thousands of tokens. Byte count is a better proxy for what an agent actually pays. Roughly four bytes per token.
 
+### Why the scans include untracked files
+
+`git grep` and `git ls-files` see only **tracked** files by default. Left that way, a brand-new doc is invisible to every check until it is committed — you write it, run the lint, get green, commit, and CI fails on a broken reference you could have fixed in place seconds earlier.
+
+The green run is the real damage. It does not mean "this file is fine"; it means "this file was not examined", and nothing distinguishes the two. Both scan wrappers therefore pass the untracked flags. Standard excludes still apply, so build output and dependencies stay out.
+
+**The general form of this mistake:** a tool that reports success on input it never looked at. Whenever you scope a check — by path, by file type, by git status — confirm that a violation *inside* the scope is actually caught, by planting one. A check that cannot fail is indistinguishable from a check that passes, and this one shipped that way until a fork test caught it.
+
 ### The session-start fast path
 
 `--session-start` runs only branch hygiene and the context-budget line, then exits. Two reasons. The heavy checks are repo health, and repo health is already gated in CI and pre-commit, so re-running it every session is redundant. And it is slow where it hurts: the per-line post-processing loops fork several subprocesses per match, so a few thousand matches becomes minutes of wall time on some platforms — long enough that a session appears to hang.
