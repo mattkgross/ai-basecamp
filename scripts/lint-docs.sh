@@ -235,9 +235,16 @@ run_branch_hygiene() {
   current=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   default=$(resolve_default_branch)
 
+  # Detached HEAD — a CI checkout. Nothing here is meaningful.
   [[ -z "$current" || "$current" == "HEAD" ]] && return 0
-  # "Behind the default branch" is meaningless while standing on it.
-  [[ -n "$default" && "$current" == "$default" ]] && return 0
+
+  # "Behind the default branch" is meaningless while standing on it. Say so
+  # rather than returning silently: an empty section reads as a broken check,
+  # and on a fresh clone this is the only line the session-start hook emits.
+  if [[ -n "$default" && "$current" == "$default" ]]; then
+    pass "On the default branch ($current) — branch-staleness check not applicable"
+    return 0
+  fi
 
   if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
     dirty_count=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
