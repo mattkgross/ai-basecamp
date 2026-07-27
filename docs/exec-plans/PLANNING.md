@@ -1,154 +1,130 @@
-# Module Decomposition — Full-Stack Feature Planning
+# Planning Methodology
 
-*Created: 2026-04-14*
-*Origin: PrepDVM project — extracted as a reusable methodology*
+How to break work into discrete, independently-buildable modules that a coding agent can execute without guessing at intent.
 
-This document describes how to break a product spec into discrete, independently-buildable implementation modules for use by Claude Code (or any AI coding agent) in a full-stack project.
+> **Before drafting any plan, read `docs/PRE-PLAN.md`.** Short by design. It catches the mistakes that plans actually make — pre-deciding things that are not the planner's to decide, and skipping the design step for user-visible surfaces.
 
----
+A **module** here means one complete, shippable segment of the product — not a layer of one. Adjust the vocabulary to your project; the sizing logic is what matters.
 
-## The Core Principle
+## The core principle
 
-**One module = one complete, shippable product segment.**
+**One module ships end to end.** Interface, logic, and data changes go together. Splitting a feature into separate front-end / back-end / schema modules creates coordination overhead and leaves the system in half-built states that nobody can test.
 
-Each module ships UI + API routes + database changes together. Never split a feature into separate FE/BE/DB modules — that creates coordination overhead and leaves things in half-built states. If a module needs "and" more than once to describe its job, it's too big. Split it.
+If describing a module needs the word "and" more than once, it is too big. Split it.
 
----
-
-## Sizing Heuristics
-
-A well-sized module fits these constraints:
+## Sizing heuristics
 
 | Dimension | Target |
-|-----------|--------|
-| Describable in one sentence (without "and") | Required |
-| UI screens | 1-3 |
-| New API routes | 1-4 |
-| New database tables | 0-2 |
-| Cross-boundary? (student vs. admin, user vs. internal) | Avoid — split on boundary |
-| Completable in one Claude Code session | Required |
+|---|---|
+| Describable in one sentence without "and" | Required |
+| Completable in one focused working session | Required |
+| User-facing screens or surfaces | 1–3 |
+| New API endpoints | 1–4 |
+| New data-model entities | 0–2 |
+| Crosses an audience boundary (end user vs. internal) | Avoid — split on the boundary |
 
-If a module fails two or more of these checks, split it.
+Failing two or more of these means split.
 
----
+## Decomposition process
 
-## Decomposition Process
+1. **List every feature** from the spec. Every distinct screen, action, and behavior. Do not group yet.
+2. **Find the natural clusters.** Features sharing a user journey, a data entity, or an API surface are module candidates.
+3. **Apply the sizing check.** Where a candidate fails, split on the most natural seam. The ones that recur:
+   - **Flow + result** — a complex interaction and the surface that reports its outcome are usually two modules.
+   - **End user + internal** — the user-facing and admin-facing sides of one feature are separate modules.
+   - **Engine + consumers** — core logic separates from the surfaces that call it.
+4. **Map dependencies.** *Hard* — upstream modules that must exist first. *Soft* — modules that enrich this one but can be stubbed.
+5. **Order the build.** Foundation (shell, auth) → the core loop that creates the value → layers depending on that loop → surfaces needing real data → conversion and business features → internal tooling. Record the order in `module-index.md`.
 
-### Step 1: List all features from the product spec
-Go through every section of the spec. Write down every distinct feature, screen, and user action. Don't group yet.
+## Module outline format
 
-### Step 2: Identify natural clusters
-Group features that share the same user journey, the same database table, or the same API surface. These are module candidates.
-
-### Step 3: Apply the sizing check
-For each candidate, apply the heuristics above. If it fails: split on the most natural boundary. Common splits:
-- **Active + Results**: a complex flow and its output are often two modules (e.g., exam-taking vs. exam-results)
-- **User + Admin**: user-facing and admin-facing sides of the same feature are separate modules
-- **Core logic + Wiring**: algorithm/engine modules separate from the UI surfaces that consume them
-
-### Step 4: Map dependencies
-For each module, identify:
-- **Hard dependencies**: upstream modules that must be built first (required tables, APIs, auth)
-- **Soft dependencies**: modules that enrich this one but aren't blockers (can use mock data if absent)
-
-### Step 5: Order the build sequence
-Build order follows the dependency graph:
-1. Foundation (app shell, auth)
-2. Core product loop (the thing that creates primary value)
-3. Layers that depend on the loop (feature modes, AI integrations)
-4. Intelligence/analytics surfaces (need real data from the loop)
-5. Conversion and business features (payments, referrals)
-6. Admin and marketing (largely independent, can be parallelized)
-
----
-
-## Module Outline Format
-
-Each module lives in "docs/exec-plans/planned/module-NN-slug.md". The outline is intentionally lightweight — detailed plans are written JIT when the module enters active development.
+Outlines live in `docs/exec-plans/planned/` as `module-NN-slug.md`. Deliberately lightweight — details are written just-in-time when the module goes active, because a detailed plan written now is stale by the time you reach it.
 
 ```markdown
-# Module NN: [Name]
+# Module NN: Name
 
 *Status: Planned — outline only*
 *Dependencies: Module XX, Module YY*
 
-> **Before executing:** Review this plan against the current repo state.
-> Verify assumptions, check for drift from earlier modules, and surface
-> any conflicts or questions before building.
+> **Before executing:** review this plan against the current repo state.
+> Verify its assumptions, check for drift from earlier modules, and surface
+> conflicts or questions before building.
 
 ## Goal
-[One sentence. No "and".]
+One sentence. No "and".
 
 ## Scope
 ### In
-[Bullet list of what this module ships]
-
+What this module ships.
 ### Out
-[Explicit exclusions — prevents scope creep]
+Explicit exclusions. Without these, scope grows.
 
-## Key Deliverables
-### UI / API Routes / Database
-[Concrete outputs — screens, routes, tables]
+## Key deliverables
+Concrete outputs — surfaces, endpoints, entities.
 
-## Acceptance Criteria
-[Binary pass/fail checks — not "should be fast" but "P95 < 200ms"]
+## Acceptance criteria
+Binary pass/fail. Not "should be fast" but "p95 under 200ms". Not
+"handles errors" but "returns 400 with this error shape".
 
-## v0 Prototype
-[Yes / No — and why]
+## Design
+Does this need a design pass before implementation? Yes / no, and why.
+See `docs/PRE-PLAN.md`.
 
 ## Environment
-[Local / Dev / Prod notes. New env vars.]
+Per-environment notes. New configuration keys.
 
 ## References
-[Links to relevant spec sections]
+Links to the spec sections this implements.
 ```
 
----
+## The drift header
 
-## The Drift Header
+Every outline carries it:
 
-Every module outline includes this header:
+> **Before executing:** review this plan against the current repo state. Verify its assumptions, check for drift from earlier modules, and surface conflicts or questions before building.
 
-> **Before executing:** Review this plan against the current repo state. Verify assumptions, check for drift from earlier modules, and surface any conflicts or questions before building.
+This is load-bearing. Plans are written before the code exists, so by the time module 15 is picked up the codebase may not resemble what module 15 assumed. Reconcile *before* executing, not after — discovering the mismatch halfway through means unwinding work.
 
-This is critical. Modules are written before the code exists. By the time Claude Code picks up a late module, the codebase may look very different from what the plan assumed. The builder must reconcile before executing, not after.
+## The retrospective
 
----
+Every module gets a "What actually shipped" section appended before it moves to `completed/`. It is the mirror of the drift header: the drift header reconciles the plan against reality *before* building; the retrospective records the divergence *after* shipping, so the next module's drift check has something concrete to reconcile against.
 
-## v0 Prototyping
+Cover five things:
 
-Run v0 (or equivalent UI prototyping tool) **before** full-stack implementation for any module with significant UI surface. This prevents building to a blind design.
+1. **What actually shipped** — one paragraph. Dates, links, the surface now available to downstream work.
+2. **Phase by phase** — what each phase delivered. Note anything that landed differently than scoped.
+3. **Deviations from the plan** — numbered. For each: what changed, why, and the lesson if there is one. **This is the highest-value part.** Patterns hide here, and they are invisible from the code alone.
+4. **Deferred elsewhere** — explicit re-routes, naming the receiving module so `module-index.md` gets updated in the same pass.
+5. **Outstanding follow-ups** — anything needing a row in `docs/decisions/OPEN.md` or a new outline. If this module *resolved* an existing row, close it in this same change by moving the row to `RESOLVED.md`.
 
-**Modules that benefit from v0:**
-- Any user-facing screen (core product UI, home, analytics surfaces)
-- Any conversion flow (trial results, pricing page, landing page)
-- Any complex navigation or layout (multi-state flows, desktop-first layouts)
+The retrospective is a forcing function, not a writing exercise. Abandoned experiments, implicit deferrals, and "we would do this differently" lessons evaporate into chat history if nobody writes them down at close — and the next agent has no chat history. It has this file.
 
-**Modules that can skip v0:**
-- Backend-heavy modules (algorithm engines, webhook handlers, cron jobs)
-- Admin-only interfaces (functional over beautiful)
-- Modules where the spec provides detailed wireframes
+The harness lint warns when a completed plan has no retrospective. Supporting artifacts alongside a plan (design briefs, interview notes) opt out with `<!-- no-retrospective: reason -->`.
 
----
+## When to write the full plan
 
-## Lifecycle: Planned → Active → Completed
+1. Move the outline from `planned/` to `docs/exec-plans/active/`.
+2. Expand it: exact contracts, full schema, complete acceptance criteria, test cases.
+3. Review it against the current repo state and update before building.
+4. On completion: append the retrospective, rename to `YYYY-MM-DD-slug.md`, move to `completed/`, and update `module-index.md`. **This close-out ships in the same change as the module's final phase — never a follow-up.**
 
-| State | Location | Detail Level |
-|-------|----------|-------------|
-| Planned | `docs/exec-plans/planned/` | Lightweight outline — goal, scope, key deliverables, acceptance criteria sketch |
-| Active | `docs/exec-plans/active/` | Full plan — exact API contracts, complete schema, full acceptance criteria, test cases |
-| Completed | `docs/exec-plans/completed/` | Record of what shipped — what was built, what changed from plan |
-| Debt | `docs/exec-plans/debt/` | Known shortcuts taken — what needs revisiting later |
+Known shortcuts taken deliberately go to `docs/exec-plans/debt/` with what was skipped and what would trigger fixing it.
 
-**Don't write all detailed plans upfront.** Write the outline, move to active when work starts, flesh out the detail then. Plan 18 written today is stale by the time you reach it.
+## One pull request per module
 
----
+A phased module ships as **one PR** at close-out. Phases are commit-level structure on a single branch, not PR-level structure.
 
-## Anti-Patterns to Avoid
+**Why:** a reviewer evaluates the module as one coherent change. Per-phase PRs fragment the review surface — reviewing one logical feature means context-switching across several PRs — and stacked-PR tooling adds overhead disproportionate to a module this size. Per-phase commit messages (`type(module-NN): Phase X — summary`) give the PR an internal narrative a reviewer can scan without leaving it.
 
-- **Too big:** "Implement the full admin panel" — split into CRUD, review queue, analytics, dashboard
-- **FE/BE split:** "Build the UI, then wire up the API" — these go in one module
-- **No explicit exclusions:** Without Scope Out, future builders add scope. Always say what this module is NOT.
-- **Stale detailed plans:** Writing all detailed plans upfront means late plans are stale by the time you reach them. Outlines now, details JIT.
-- **Missing drift header:** Plans age. The drift check is the defense against building on stale assumptions.
-- **Too small:** If a module is just one API route with no meaningful UI or schema change, consider whether it belongs in an adjacent module.
+**In practice:** finish a phase → commit, do not open a PR. Finish the module → open the single PR with the close-out artifacts in it. If the maintainer explicitly asks for stacked PRs — usually because one phase is independently shippable and time-sensitive — do that instead. One PR is the default.
+
+## Anti-patterns
+
+- **Too big.** "Implement the admin panel." Split into the CRUD surface, the review queue, the analytics view.
+- **Layer split.** "Build the UI, then wire the API." One module.
+- **No exclusions.** Without *Scope → Out*, scope grows. Always say what the module is not.
+- **All plans written upfront.** Plan 18 is stale before you reach it. Outlines now, details just-in-time.
+- **Missing drift header.** Plans age. The drift check is the defense against building on stale assumptions.
+- **Skipped retrospective.** Moving a plan to `completed/` without recording what shipped. The lessons evaporate and the next drift check has nothing to check against.
+- **Close-out in a follow-up.** Moving the plan, writing the retrospective, and updating the index *after* the implementation merged. The close-out is part of the implementing change.
+- **Per-phase PRs.** See § One pull request per module.

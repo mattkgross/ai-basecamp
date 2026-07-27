@@ -1,0 +1,36 @@
+# Dependency update automation.
+#
+# Uncomment the ecosystem your project uses. Cheapest possible security win:
+# vulnerability alerts and upgrade pull requests, for zero maintenance.
+#
+# Grouping matters. Ungrouped updates produce a pull request per dependency per
+# week, which is the reliable way to train everyone to ignore Dependabot — and an
+# ignored security alert is the same as no security alert. Group the routine ones
+# and let the majors arrive alone, where they get read.
+
+version: 2
+
+updates:
+  # GitHub Actions — always applicable once you have any workflow.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # --- Uncomment and adjust for your stack ---
+  #
+  # - package-ecosystem: "npm"        # or pip, cargo, gomod, bundler, nuget, maven
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   open-pull-requests-limit: 5
+  #   groups:
+  #     # Routine bumps arrive as one reviewable pull request.
+  #     minor-and-patch:
+  #       patterns: ["*"]
+  #       update-types: ["minor", "patch"]
+  #   # Majors stay separate so their breaking changes get read.

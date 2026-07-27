@@ -1,55 +1,86 @@
-# AI Basecamp — How to Use This Template
+# Fork Checklist
 
-## Quick Start
+What to do after cloning this template. Delete this file once you have worked through it — it is scaffolding, not project documentation.
 
-1. Copy this template into a new repo (or use GitHub's "Use this template" feature)
-2. Run `./scripts/setup.sh` to install git hooks
-3. Run `/harness-bootstrap` to scaffold the harness structure (exec-plans, decisions, patterns, lint script)
-4. Replace `ARCHITECTURE.md` with your actual system design
-5. Customize `CLAUDE.md` with project-specific agent rules and harness invariants
-6. Add lint/format/build commands to the hook scripts and CI workflow
-7. Start building
+## 1. Detach and set up
 
-## What's Included (Tier 1)
-
-```
-CLAUDE.md                              ← Agent operating manual
-ARCHITECTURE.md                        ← System design skeleton
-docs/
-  PATTERNS.md                          ← Code conventions (starts empty)
-  specs/                               ← Feature specs go here
-.github/
-  review-agents/
-    pattern-reviewer.md                ← CI review agent prompt
-  templates/
-    pull_request_template.md           ← PR checklist
-scripts/
-  setup.sh                            ← One-command project setup
-  hooks/
-    pre-commit                         ← Lint, format, secrets
-    pre-push                           ← Build, doc-drift check
+```bash
+rm -rf .git && git init && git add -A && git commit -m "Initial commit from ai-basecamp"
+./scripts/setup.sh
 ```
 
-## What to Customize
+`setup.sh` installs the git hooks, creates the `CLAUDE.md` → `AGENTS.md` symlink, and runs the validator.
 
-- **Hook scripts:** Add your lint/format/build commands (marked with TODO)
-- **CI workflow:** Add a ".github/workflows/ci.yml" for your stack
-- **Doc-drift mappings:** Update `pre-push` hook with your source→doc mappings
-- **.gitignore:** Add stack-specific ignores
+## 2. Fill in `AGENTS.md`
 
-## Tier 2 (Add When Growing)
+This is the only auto-loaded doc, so it is the highest-leverage file in the repo. Replace each *italic placeholder*:
 
-When the project has real users and revenue, consider adding:
-- Security reviewer (".github/review-agents/security-reviewer.md")
-- Architecture reviewer (".github/review-agents/architecture-reviewer.md")
-- Auto-fix pipeline (".github/workflows/auto-fix.yml")
-- LESSONS.md, DECISIONS.md, module READMEs
-- Layer 3 adversarial testing in CI
+- **What this project is** — one paragraph. What it is, who it serves, the load-bearing constraints, and the single most important thing an agent should know first.
+- **Repo state** — pre-code, for now.
+- **Boundaries** — name your shared-environment commands (the ones an agent must never run against staging or production) and any domain-specific prohibitions.
+- **Decision rule** — who decides what, and what needs sign-off.
+- **House style** — keep what you agree with, delete the rest. These are preferences, not lessons.
 
-See `research/development-workflow.md` for the full methodology.
+**Leave a placeholder rather than guessing.** A wrong guess here is loaded into every session and treated as fact.
 
-## Feedback Loop
+## 3. Write `ARCHITECTURE.md`
 
-Every process learning from any project should flow back here:
-- "Would I want this on day one of the next project?" → Update this template
-- Track changes in CHANGELOG.md
+Replace the skeleton with your actual design: components with their responsibilities and connections, the data model, and each significant technology choice **with the reasoning**. The reasoning is what you will need in six months when circumstances change and you have to judge whether the choice still holds.
+
+## 4. Record your stack as decision `0002`
+
+Your first real decision record. It gives the project an architectural anchor and starts the record habit while it is still cheap — the habit is hard to start later, because by then there is a backlog of undocumented decisions and writing the first one feels like admitting the debt.
+
+## 5. Wire your stack into the gates
+
+Three places, and they should agree:
+
+- **`scripts/check.sh`** — add your gates to the `CHECKS` array, cheapest first.
+- **`.github/workflows/ci.yml`** — replace the placeholder step. Pin the runtime version in a file, not inline.
+- **`scripts/hooks/pre-commit`** — add per-file fixers if you use them. Keep them scoped to the staged set.
+
+## 6. Tune the validator's CONFIG block
+
+Only the block at the top of `scripts/lint-docs.sh`:
+
+| Knob | Set it when |
+|---|---|
+| `REQUIRED_FILES` | A new doc becomes load-bearing |
+| `XREF_PREFIXES` | Your docs start citing source paths — add `src/` or your equivalent |
+| `SOURCE_DIR`, `SOURCE_EXTENSIONS` | Your layout or language differs from the default |
+| `DENY_PATTERNS` | You have content that must never be committed |
+| `BANNED_AUTO_COMMANDS` | You have commands that must never run unattended |
+| `DEAD_NAME_PATTERNS` | **After your first rename** — not before |
+| Budgets | The defaults are wrong for you. They probably are not yet. |
+
+## 7. Take the recipes you need
+
+`docs/harness/recipes.md` holds guards that cannot be stack-neutral — database invariants, package-manager override enforcement, CI configuration coverage, numbered-file uniqueness. Each names the failure it catches. Paste in what applies; ignore the rest.
+
+## 8. Stack-specific ignores
+
+Add your build output, dependency directories, and local config to `.gitignore`.
+
+## 9. Delete what you do not need
+
+Genuinely optional: `docs/specs/` if you plan differently, `docs/ENVIRONMENTS.md` if you have exactly one environment, `docs/process/development-workflow.md` if you already know how you work. Deleting a doc means also removing its routing row — the validator will tell you if you forget, which is the point.
+
+## 10. Verify
+
+```bash
+bash scripts/lint-docs.sh
+```
+
+Green, or warnings you understand. Fix failures before starting feature work: a harness that ships red teaches everyone to ignore it on day one, and that habit does not reverse.
+
+---
+
+## Feeding learnings back
+
+When you discover something in a project that would have helped from the start, ask: **would I want this on day one of the next project?** If yes, it belongs in the template.
+
+- Universal mechanism → the validator or the harness docs.
+- Stack-specific guard → `docs/harness/recipes.md`, **with the bug that motivated it**. The bug is what convinces the next reader not to delete it.
+- Process change → `docs/process/development-workflow.md`.
+
+Record it in the template's `CHANGELOG.md` so its evolution stays legible.
