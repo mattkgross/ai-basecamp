@@ -1,97 +1,89 @@
 ---
 name: harness-ingest
-description: Audit an existing repo and propose a phased plan to retrofit the ai-basecamp harness pattern (AGENTS.md routing, CLAUDE.md invariants, lint-docs.sh validator, decision records, exec plans, skill scaffolding). Use when an established project wants to adopt the harness without breaking existing workflows. For greenfield projects, use `harness-bootstrap` instead.
+description: Audit an existing repo and produce a phased, reversible plan to retrofit the harness — routing table, lint validator, decision records, plan directories, doc splits. Use when an established project wants to adopt the harness without disrupting existing workflows. For greenfield projects use harness-bootstrap instead.
 argument-hint: "[path-to-target-repo]"
 ---
 
 # Harness Ingest
 
-Adapt an existing repo to the harness pattern in **phased, reversible** steps. The output is a plan file the user reviews and approves before any structural change lands.
+Adapt an existing repo to the harness in **phased, reversible** steps.
 
-This skill never makes destructive moves on the first pass. It produces a plan; the user executes the plan tier-by-tier with confirmations at decision points.
+The output is a plan the user reviews before any structural change lands. This skill never makes destructive moves on the first pass — retrofitting a harness into a working repo means touching files people rely on, and the failure mode is a helpful-looking restructure that breaks someone's mental map of their own project.
 
 ## Inputs
 
-- `$ARGUMENTS` — path to the target repo (defaults to current working directory).
-- The skill operates entirely on the target repo. It does not modify the ai-basecamp template.
+`$ARGUMENTS` — path to the target repo, defaulting to the working directory. This skill operates only on the target and never modifies the template.
 
 ## Step 1 — Inventory
 
-Read enough of the repo to classify each harness piece as **present**, **partial**, or **absent**. Specifically:
+Classify each piece as **present**, **partial**, or **absent**, with a one-line note on what was found:
 
-| Harness piece | What to look for |
+| Piece | Look for |
 |---|---|
-| Top-level routing | `AGENTS.md` with a "Where to look" table |
-| Agent invariants | `CLAUDE.md` with harness invariants section |
-| Code patterns | `docs/PATTERNS.md` or equivalent |
-| Architecture doc | `ARCHITECTURE.md`, `docs/DESIGN.md`, or equivalent |
-| Decision records | `docs/decisions/` with ADRs |
-| Open-decision tracker | `docs/decisions/OPEN.md` (or similar) |
-| Exec-plan dirs | `docs/exec-plans/{active,completed,debt,planned}/` |
-| Planning methodology | `docs/exec-plans/PLANNING.md` |
-| Lint validator | `scripts/lint-docs.sh` or similar |
-| SessionStart hook | `.claude/settings.json` with SessionStart |
-| Skills | `.agents/skills/*/SKILL.md` or `.claude/commands/*.md` |
-| PR template | `.github/templates/pull_request_template.md` |
-| Doc-length sanity | All `docs/**/*.md` under ~400 lines |
+| Routing table | An agent guide with a "where to look" table |
+| Agent-guide aliasing | Whether the runtime-specific filenames are symlinked or duplicated |
+| Code patterns | A patterns doc, split or monolithic |
+| Architecture doc | Any current description of system structure |
+| Decision records | A directory of numbered records |
+| Open-decision tracker | A single place listing undecided things |
+| Plan directories | Active / completed / planned / debt separation |
+| Planning methodology | Written decomposition and retrospective rules |
+| Lint validator | Any mechanical doc-health check |
+| Session hook | Anything running at agent session start |
+| Skills | Reusable agent procedures |
+| Pull request template | **At the path the platform actually reads** |
+| Doc sizing | Whether any doc exceeds a sane token budget |
 
-For each row: present / partial / absent, with a one-line note on what was found.
-
-## Step 2 — Diagnose oversized docs
-
-Run an equivalent of:
+## Step 2 — Size the docs
 
 ```bash
-git ls-files 'docs/**/*.md' | xargs -I{} wc -l {} | sort -rn | head -10
+git ls-files 'docs/*.md' 'docs/**/*.md' | xargs -I{} wc -c {} | sort -rn | head -10
 ```
 
-Any doc over ~400 lines is a split candidate. For each: identify the natural seams (top-level H2 sections) and propose the slice file layout (`docs/<topic>/README.md` index + slice files keyed on the H2 sections).
+Measure **bytes**, not lines. A line count is blind to long-line bloat, and the docs most in need of splitting are frequently the ones that read fine by line count — dense tables and packed status entries are exactly where the tokens hide.
 
-## Step 3 — Identify routing gaps
+For each oversized doc, identify the natural seams (usually top-level headings) and propose the slice layout: `docs/<topic>/README.md` as the routing index plus one file per seam.
 
-For every `docs/*.md` and `docs/<topic>/README.md` in the target repo, check whether it appears in the existing routing surface (AGENTS.md, README.md, or the dominant nav). Anything not reachable from the entrypoint is an orphan or a hidden doc.
+## Step 3 — Find routing gaps
+
+For every doc, check whether it is reachable from the entry point. Anything unreachable is effectively invisible — it exists, and no agent will ever open it. List them.
 
 ## Step 4 — Surface anti-patterns
 
-Flag any of these if you see them:
+Flag any of these:
 
-- **"Convenience copies"** — summary docs, FAQ files, forwarding caches that aren't mechanically synced with their sources. These go stale first; recommend deletion in favor of making the source small enough to traverse directly.
-- **Backticked references to non-existent paths** — common drift symptom. List them.
-- **TODO / FIXME without a corresponding 🚧 / ⏳ marker** — un-tracked decisions. Recommend either elevating to a marker + OPEN.md row or closing as not-going-to-happen.
-- **Docs in `completed/` that lack retrospectives** — the "what actually shipped" pattern is load-bearing for institutional memory; flag for backfill.
-- **Section anchors (`§ NN.M`) that no longer match heading numbers after silent edits** — a brittleness symptom.
+- **Convenience copies** — summary docs, FAQ files, or forwarding caches not mechanically synced with their source. These go stale first and are believed longest, because they read as authoritative. Recommend deleting them in favor of making the source small enough to traverse directly.
+- **Backticked paths that do not resolve** — the most common drift symptom. List every one.
+- **`TODO` / `FIXME` standing in for a decision** — untracked open questions. Either elevate to a tracker row or close as not-happening.
+- **Completed plans with no retrospective** — the institutional memory is already gone; flag for backfill while anyone still remembers.
+- **Duplicated agent guides** — two runtime-specific files with overlapping content. Check whether they have already drifted; they usually have, and neither is marked as authoritative.
+- **Section references that no longer resolve** — pointers into headings that were renamed or moved.
 
-## Step 5 — Produce `docs/HARNESS_INGEST_PLAN.md`
+## Step 5 — Write the plan
 
-Write a plan file in the **target repo** at `docs/HARNESS_INGEST_PLAN.md`, structured as:
+Write to the **target repo** as a plan file, structured as:
 
-1. **Context** — why this restructure is being proposed; what the user gets.
-2. **Inventory table** — the present/partial/absent matrix from Step 1.
-3. **Splits** — proposed split layout for each oversized doc, with file paths, approximate line counts, and the slice index design.
-4. **Sequencing** — 4-6 tiers, ordered low-blast-radius first. Each tier is independently shippable as a single commit.
-5. **Risks & reversibility** — what breaks during each tier, what the lint will catch, how to revert.
-6. **Verification** — how to confirm each tier landed cleanly (`bash scripts/lint-docs.sh`, end-to-end skill invocation, etc.).
-7. **Critical files** — exact paths the user will touch.
+1. **Context** — why this restructure, what the user gets.
+2. **Inventory** — the matrix from Step 1.
+3. **Splits** — proposed layout per oversized doc, with paths, sizes, and index design.
+4. **Sequencing** — four to six tiers, lowest blast radius first, each independently shippable as one commit. Lint and hook wiring go in the first tier, so every later tier is verified by mechanism rather than by eye.
+5. **Risks and reversibility** — what breaks during each tier, what the lint catches, how to revert.
+6. **Verification** — how to confirm each tier landed.
+7. **Files touched** — exact paths.
 
-Use PrepDVM's harness restructure (recorded in `docs/exec-plans/completed/` of the PrepDVM repo and via the ai-basecamp template) as a reference shape. The PrepDVM session split DB.md, CATEGORIES.md, QUESTION_RULES.md, PATTERNS.md, and PRODUCT.md across 5 tiers, with decision-sync and AGENTS-index lint patches in T1; skill drift fixes in T5; same pattern transplants here.
+## Step 6 — Stop
 
-## Step 6 — Stop and wait
+Do **not** execute the plan. Hand it back with a one-paragraph summary and let the user approve as-is, edit and re-invoke, or reject specific tiers.
 
-Do NOT execute the plan after writing it. Hand the file back to the user with a one-paragraph summary and let them decide:
-
-- Approve the plan as-is.
-- Edit the plan file and re-invoke this skill (which will re-read and proceed).
-- Reject specific tiers and execute the rest.
-
-Each tier executes as its own session. The user runs `/harness-bootstrap` (audit mode) after each tier to confirm the lint stays green.
+Each tier runs as its own session, with the lint re-run after each to confirm it stayed green.
 
 ## Constraints
 
-- **Never delete anything in the target repo without an orphan audit.** If the plan calls for deleting a redundant doc, the audit step (mapping each section to its replacement home) is mandatory and must run *before* the delete.
-- **Never edit the target repo's history.** Splits and renames preserve git history via `git mv`. Direct file rewrites lose the trail.
-- **Respect the target repo's existing conventions when they don't conflict with the harness.** If the project already has `docs/architecture.md` instead of `ARCHITECTURE.md`, leave it; the harness pattern is shape-of-doc, not exact filename.
-- **Stop if the project owner hasn't approved a destructive step.** Even in auto mode. The harness is supposed to make destructive actions safer, not faster.
+- **Never delete without an orphan audit.** If the plan removes a doc, first map every section to its replacement home. That audit is mandatory and runs *before* the delete — it is also how you discover the one section that had no replacement.
+- **Preserve history.** Splits and renames use `git mv`. A rewrite-and-delete loses the trail, which is exactly the trail someone needs when the split turns out wrong.
+- **Respect existing conventions that do not conflict.** If the project keeps its architecture doc at a lowercase path under its docs directory rather than at the repo root, leave it there. The harness is a shape, not a set of filenames; renaming for conformity spends the user's goodwill on nothing.
+- **Stop at any destructive step the owner has not approved.** Even when told to proceed autonomously. The harness exists to make destructive actions safer, not faster.
 
 ## Reciprocity
 
-When this skill discovers a useful pattern in a target repo that the ai-basecamp template doesn't yet capture (a new lint check, a decision-tracker convention, a useful skill), record it in `docs/decisions/OPEN.md` of the ai-basecamp repo as a "candidate to port back" item. The template should learn from every ingest.
+When an ingest finds a pattern in a target repo that the template lacks — a lint check, a tracker convention, a useful skill — record it as a candidate to port back. The template should learn from every ingest; otherwise each one re-derives the same lessons.

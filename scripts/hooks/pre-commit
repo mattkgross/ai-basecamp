@@ -1,31 +1,83 @@
-#!/bin/bash
-# Pre-commit hook: lint, format, secret detection
-# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+#!/usr/bin/env bash
+# Pre-commit hook — secret detection, then a harness gate scoped to this commit.
+#
+# Install: ./scripts/setup.sh  (or copy to .git/hooks/pre-commit and chmod +x)
+#
+# Design note: this hook enforces only what THIS commit touches. A whole-repo
+# gate here punishes you for pre-existing issues you did not introduce, which
+# trains everyone to reach for --no-verify — and a bypassed gate enforces
+# nothing. Repo-wide health belongs in CI and /harness-check. The per-commit
+# question is narrower and answerable: "is what I am committing right now OK?"
 
 set -e
 
-echo "🔍 Running pre-commit checks..."
+echo "Running pre-commit checks..."
 
-# --- Secret Detection ---
-# Requires: gitleaks (https://github.com/gitleaks/gitleaks)
-if command -v gitleaks &> /dev/null; then
-    echo "  🔑 Checking for secrets..."
-    gitleaks git --pre-commit --staged --no-banner -q
-    if [ $? -ne 0 ]; then
-        echo "  ❌ Secrets detected! Remove them before committing."
-        exit 1
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+[ -z "$STAGED" ] && exit 0
+
+# ── Secret detection ───────────────────────────────────────────────────────
+# A leaked credential is the one mistake a later commit cannot undo — once it is
+# in history it must be treated as compromised and rotated. Cheapest possible
+# place to catch it.
+if command -v gitleaks >/dev/null 2>&1; then
+  # Capture rather than stream, so a TOOLING failure can be told apart from a
+  # FINDING. gitleaks exits non-zero for both — a bad flag and a real leak look
+  # identical to `if !`. Reporting "secrets detected" for a usage error is the
+  # worst outcome available: it blocks every commit with a message that sends the
+  # author looking for a secret that does not exist, and the fix they land on is
+  # to stop running the hook.
+  if ! GITLEAKS_OUT=$(gitleaks git --pre-commit --staged --no-banner -l error 2>&1); then
+    echo ""
+    if echo "$GITLEAKS_OUT" | grep -qiE 'unknown (shorthand )?flag|unknown command|invalid argument'; then
+      echo "⚠ gitleaks failed to run — this is a tooling problem, NOT a detected secret:"
+      echo "$GITLEAKS_OUT" | grep -iE 'unknown|invalid' | sed 's/^/    /'
+      echo "  Check the gitleaks invocation in scripts/hooks/pre-commit against your"
+      echo "  installed version ($(gitleaks version 2>/dev/null || echo 'unknown')). Skipping the scan."
+    else
+      echo "✗ Secrets detected in staged changes. Remove them before committing."
+      echo "$GITLEAKS_OUT" | sed 's/^/    /'
+      exit 1
     fi
-    echo "  ✅ No secrets found"
+  else
+    echo "  ✓ No secrets detected"
+  fi
 else
-    echo "  ⚠️  gitleaks not installed — skipping secret detection"
-    echo "     Install: https://github.com/gitleaks/gitleaks#installing"
+  echo "  ⚠ gitleaks not installed — skipping secret detection"
+  echo "    Install: https://github.com/gitleaks/gitleaks#installing"
 fi
 
-# --- Lint & Format ---
-# TODO: Add project-specific lint/format commands here
-# Examples:
-#   npm run lint
-#   dotnet format --verify-no-changes
-#   cargo fmt --check
+# ── Formatters / fixers ────────────────────────────────────────────────────
+# Add your per-file fixers here — they should operate on the staged set only,
+# then re-stage what they change. Examples:
+#
+#   npx lint-staged
+#   pre-commit run --files $STAGED
+#
+# Keep whole-tree formatting out of this hook; it makes commits touch files the
+# author never opened, which makes review harder and blame useless.
 
-echo "✅ Pre-commit checks passed"
+# ── Harness gate, scoped to the staged set ─────────────────────────────────
+# Run the full validator but fail only on findings that name a staged file.
+if echo "$STAGED" | grep -qE '\.md$'; then
+  LINT_OUTPUT=$(bash scripts/lint-docs.sh --quiet 2>&1 || true)
+  RELEVANT=""
+  for f in $STAGED; do
+    MATCHES=$(printf '%s\n' "$LINT_OUTPUT" | grep -F "$f" | grep -E '^[[:space:]]*✗' || true)
+    if [ -n "$MATCHES" ]; then
+      RELEVANT="$RELEVANT
+$MATCHES"
+    fi
+  done
+  if [ -n "$RELEVANT" ]; then
+    echo ""
+    echo "✗ Harness lint failures in staged file(s):"
+    echo "$RELEVANT"
+    echo ""
+    echo "Fix and re-stage. Run 'bash scripts/lint-docs.sh' for the full report."
+    exit 1
+  fi
+  echo "  ✓ Harness lint clean for staged docs"
+fi
+
+echo "✓ Pre-commit checks passed"
