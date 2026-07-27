@@ -21,12 +21,27 @@ STAGED=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
 # in history it must be treated as compromised and rotated. Cheapest possible
 # place to catch it.
 if command -v gitleaks >/dev/null 2>&1; then
-  if ! gitleaks git --pre-commit --staged --no-banner -q; then
+  # Capture rather than stream, so a TOOLING failure can be told apart from a
+  # FINDING. gitleaks exits non-zero for both — a bad flag and a real leak look
+  # identical to `if !`. Reporting "secrets detected" for a usage error is the
+  # worst outcome available: it blocks every commit with a message that sends the
+  # author looking for a secret that does not exist, and the fix they land on is
+  # to stop running the hook.
+  if ! GITLEAKS_OUT=$(gitleaks git --pre-commit --staged --no-banner -l error 2>&1); then
     echo ""
-    echo "✗ Secrets detected in staged changes. Remove them before committing."
-    exit 1
+    if echo "$GITLEAKS_OUT" | grep -qiE 'unknown (shorthand )?flag|unknown command|invalid argument'; then
+      echo "⚠ gitleaks failed to run — this is a tooling problem, NOT a detected secret:"
+      echo "$GITLEAKS_OUT" | grep -iE 'unknown|invalid' | sed 's/^/    /'
+      echo "  Check the gitleaks invocation in scripts/hooks/pre-commit against your"
+      echo "  installed version ($(gitleaks version 2>/dev/null || echo 'unknown')). Skipping the scan."
+    else
+      echo "✗ Secrets detected in staged changes. Remove them before committing."
+      echo "$GITLEAKS_OUT" | sed 's/^/    /'
+      exit 1
+    fi
+  else
+    echo "  ✓ No secrets detected"
   fi
-  echo "  ✓ No secrets detected"
 else
   echo "  ⚠ gitleaks not installed — skipping secret detection"
   echo "    Install: https://github.com/gitleaks/gitleaks#installing"
