@@ -253,6 +253,47 @@ Run it after touching the guard. It does not need to be in CI — its job is to 
 
 ---
 
+## 11. Repeating rows need a cap on the row, not just the file
+
+**Applies to:** any project with an index or registry document whose entries follow a repeating convention — a module index, an ADR index, a service catalog, a supported-platforms table.
+
+**The failure:** a byte cap on a whole file is a lagging indicator. It fires only after the damage, and it cannot say *which* section bloated, so its remedy text can only guess ("split by topic, or archive settled content"). In the source project a module index reached its cap with one table holding **71% of the file** — 39KB across 88 lines — and 40% of that table came from 13% of its rows. Four separate archive passes deleted old rows to make room for one new one each. Every pass treated the symptom; none touched the row convention that was the actual cause.
+
+**Fix the table's shape first, then guard it.** The root cause was structural, not editorial: the table declared four columns and had no **Status** column, so status, date, narrative, and links all landed in the last cell — and a last cell has no successor to stop it. Nothing in the row's shape said "you are done." The template's own index table in `docs/exec-plans/module-index.md` already has Status and Plan as separate columns, which is the shape that prevents this; the guard below is what keeps a fork from drifting out of it. A tell that you have this problem: the row sizes are bimodal rather than gradually rising — two conventions coexisting, not slow growth.
+
+```bash
+# --- Index rows stay pointers ---
+# Strip link TARGETS before measuring, deliberately. A legitimate row may carry
+# several ~50-char plan paths that are irreducible and are exactly what the row
+# is FOR; measuring them penalises the pointer and lets prose hide behind a short
+# path. What is capped is the prose the author actually wrote.
+# LC_ALL=C so length() counts bytes, not characters — index rows are usually full
+# of multi-byte status emoji and em-dashes.
+MAP_FILE="docs/exec-plans/module-index.md"
+MAP_ROW_CAP=500
+while IFS=$'\t' read -r map_line map_bytes map_label; do
+  [[ -z "$map_line" ]] && continue
+  warn "$MAP_FILE:$map_line — row '$map_label' is $map_bytes bytes of prose (cap: $MAP_ROW_CAP). Rows are pointers: status + one clause + a plan link."
+done < <(LC_ALL=C awk -v cap="$MAP_ROW_CAP" '
+  /^## Build order/ { intable = 1; next }
+  /^## / { intable = 0 }
+  intable && /^\| / {
+    split($0, f, "|"); label = f[2]; gsub(/^ +| +$/, "", label)
+    if (label ~ /^[0-9~]/) {
+      row = $0; gsub(/\]\([^)]*\)/, "]", row)
+      n = length(row) + 1
+      if (n > cap) printf "%d\t%d\t%s\n", NR, n, label
+    }
+  }
+' "$MAP_FILE")
+```
+
+Set the cap from measurement, not taste: in the source project the reshaped rows topped out at 367 bytes, so 500 left room for a long entry name plus one clause while making the 800–2,000-byte rows that caused the problem impossible. Confirm the number would have caught the original offenders — 34 of 69 rows, there — before committing to it. Then prove the guard fires (recipe 10): reinstating one pre-reshape row reported `855 bytes` and named it, which is what makes the green result mean something.
+
+**The general lesson:** cap the repeating unit, not only its container. A container budget lets five entries bloat while five stay terse and reads green the whole way — which is precisely the drift dynamic, so the check is blind to exactly the thing it exists to catch. And when a document has a *shape* that invites the sprawl, the guard is the second fix; the first is giving the overflowing content its own column.
+
+---
+
 ## Adding a recipe
 
 If you build a guard in a forked project that would help someone on a different stack, add it here in the same shape: **what it applies to, the failure it catches, why nothing else caught it, the code, and the general lesson underneath.** The last part is the most portable — a reader on another stack cannot use your `awk`, but they can use the reason you needed it.
