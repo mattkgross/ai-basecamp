@@ -28,6 +28,7 @@ subdirectory like .github/templates/ is silently never used.
 
 - [ ] Architecture, patterns, or spec updated if this changed any of them
 - [ ] New doc added to the routing table in `AGENTS.md`
+- [ ] External-state sync ack in the PR body if this touched a doc under `docs/integrations/` (or any other mirror of hosted state) — see `docs/integrations/README.md`
 - [ ] Plan closed out — retrospective, rename, moved to `completed/` — if this finishes one
 
 ## Out of scope
