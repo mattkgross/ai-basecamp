@@ -45,6 +45,7 @@ docs/
   patterns/                  Code conventions, pre-split by domain
   decisions/                 Records, plus pending (OPEN) and closed (RESOLVED)
   exec-plans/                Planning method, build index, and plan lifecycle
+  integrations/              Third-party config + the external-state mirror discipline
   process/                   Development workflow and maturity tiers
   PRE-PLAN.md                Read before drafting any plan
   TESTS.md  ENVIRONMENTS.md  Testing rules; per-environment differences

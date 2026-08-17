@@ -21,6 +21,7 @@
 | How this harness works and why each check exists | `docs/harness/README.md` |
 | Testing rules and conventions | `docs/TESTS.md` |
 | Per-environment differences (local / staging / production) | `docs/ENVIRONMENTS.md` |
+| Third-party integrations — config + external state CI can't verify | `docs/integrations/README.md` |
 | Plan-mode prelude — read before drafting any plan | `docs/PRE-PLAN.md` |
 | Planning methodology (decomposition, outlines, retrospectives) | `docs/exec-plans/PLANNING.md` |
 | Build order and per-unit status | `docs/exec-plans/module-index.md` |
