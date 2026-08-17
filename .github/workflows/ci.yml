@@ -28,7 +28,7 @@ jobs:
     outputs:
       code-changed: ${{ steps.changes.outputs.code }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history: the lint uses git grep and git ls-files, and the
           # change detection below needs the merge base.
@@ -74,7 +74,7 @@ jobs:
     needs: harness
     if: needs.harness.outputs.code-changed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # --- Replace everything below with your stack's steps ---
       #
