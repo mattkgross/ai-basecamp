@@ -294,6 +294,107 @@ Set the cap from measurement, not taste: in the source project the reshaped rows
 
 ---
 
+## 12. A ported surface can drop a behavior while every presence check stays green
+
+**Applies to:** any project that ships the same product on two platforms and ports surfaces between them — most concretely a React web app and a React Native / Expo app sharing a feature set, but the shape holds for any primary → secondary port (a desktop app and its CLI, an API and its SDK).
+
+**The failure:** platform-parity ratchets almost always check *presence* — for each surface reachable on the second platform, does a screen file exist? That question is blind to what the screen *does*. So a port can silently drop a behavior the original performs and stay green through type-checks, lint, the test suite, and merge, because none of them assert that the second platform's surface *behaves* like the first's.
+
+In the source project a mobile port of a practice surface dropped a terminal-branch behavior: when a caught-up learner hit Start with nothing fresh or due, the web surface auto-originated a dedicated re-review session; the mobile port dead-ended that branch and showed an empty state instead. Every surface-presence guard passed — the screen file existed. The drop surfaced only weeks later in a hand-audit, and only because that audit enumerated the *web* surface's behaviors and checked each against mobile. An audit that started from the mobile side could not have found it: you cannot notice the absence of a behavior by looking at the platform that lacks it.
+
+**Two parts, and they live in the test suite, not in `scripts/lint-docs.sh`.** This is a *code-time* concern — does the second platform's code implement the first's behavior — so it belongs with your route/screen ratchets, next to the code, not in the docs linter. (Match a gate's lane to its concern's granularity: a plan-time gate reads outlines; a code-time gate reads code.) The policy and the stack-neutral mechanism are in `docs/patterns/platform-parity.md`.
+
+*Part one — the schema that makes a malformed or silently-dropped row un-representable.* One Zod `superRefine` carries a per-disposition contract, mirroring a surface-level `deferred ⟺ tracking` rule one level down:
+
+```ts
+import { z } from "zod";
+
+const DispositionSchema = z.enum(["ported", "deferred", "primary-only", "secondary-only"]);
+
+export const BehaviorSchema = z
+  .object({
+    id: z.string().min(1),
+    description: z.string().min(1),
+    primary: z.string().min(1).nullable(),   // stable anchor (file + symbol), or null if absent here
+    secondary: z.string().min(1).nullable(),
+    disposition: DispositionSchema,
+    tracking: z.string().min(1).nullable(),  // fix/debt ref; required iff `deferred`
+    reason: z.string().min(1).nullable(),    // required iff an intentional `*-only` divergence
+    note: z.string().min(1).nullable(),
+  })
+  .superRefine((b, ctx) => {
+    const fail = (message: string, path: keyof typeof b) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [path] });
+    switch (b.disposition) {
+      case "ported":
+        if (b.primary === null || b.secondary === null) fail("`ported` needs both sides' evidence.", "secondary");
+        if (b.tracking !== null) fail("`ported` owes no fix — `tracking` must be null.", "tracking");
+        if (b.reason !== null) fail("`reason` is only for a `*-only` divergence; explain a port in `note`.", "reason");
+        break;
+      case "deferred":
+        if (b.tracking === null) fail("`deferred` must carry a `tracking` ref.", "tracking");
+        if ((b.primary === null) === (b.secondary === null))
+          fail("`deferred` is present on exactly one platform: set one side, null the other.", "secondary");
+        if (b.reason !== null) fail("A deferred gap is explained by `tracking` + `note`, not `reason`.", "reason");
+        break;
+      case "primary-only":
+        if (b.primary === null || b.secondary !== null) fail("`primary-only` sets `primary`, nulls `secondary`.", "secondary");
+        if (b.reason === null) fail("`primary-only` is intentional — give a `reason`.", "reason");
+        if (b.tracking !== null) fail("`primary-only` owes no fix — `tracking` must be null.", "tracking");
+        break;
+      case "secondary-only":
+        if (b.secondary === null || b.primary !== null) fail("`secondary-only` sets `secondary`, nulls `primary`.", "primary");
+        if (b.reason === null) fail("`secondary-only` is intentional — give a `reason`.", "reason");
+        if (b.tracking !== null) fail("`secondary-only` owes no fix — `tracking` must be null.", "tracking");
+        break;
+      default: {
+        const _exhaustive: never = b.disposition; // a new disposition without a case is a compile error
+        return _exhaustive;
+      }
+    }
+  });
+
+export const LedgerSchema = z.object({ surface: z.string().min(1), behaviors: z.array(BehaviorSchema).min(1) });
+```
+
+*Part two — the coverage gate that rides the secondary-platform delivery map.* It needs no per-surface wiring: coverage is derived from `SECONDARY_DELIVERY`, so the same PR that marks a surface delivered must add its ledger. Empty map ⇒ empty required set ⇒ the gate is a no-op (the dormant, single-platform default). Written for Jest, whose assertions carry no per-assertion message — hence the `report()`-returns-`""` pattern, so the failure diff shows the fix instructions:
+
+```ts
+import { PARITY_LEDGERS } from "../src/parity-ledgers";
+
+// surface -> screen file(s) that must exist on the secondary platform. EMPTY by default.
+const SECONDARY_DELIVERY: Record<string, readonly string[]> = {};
+
+const report = (title: string, items: string[], ...help: string[]) =>
+  items.length === 0 ? "" : ["", title, "", ...items.map((i) => `  ${i}`), "", ...help].join("\n");
+
+const delivered = () => Object.keys(SECONDARY_DELIVERY);
+const ledgered = () => Object.keys(PARITY_LEDGERS);
+
+it("gives every delivered surface a behavior parity ledger", () => {
+  const missing = delivered().filter((k) => !(k in PARITY_LEDGERS)).sort();
+  expect(report("Delivered surface(s) with no parity ledger:", missing,
+    "Add a ledger in src/parity-ledgers.ts — run the platform-parity-audit skill on the surface.")).toBe("");
+});
+
+it("keeps no ledger for a surface not delivered on the secondary platform", () => {
+  const orphan = ledgered().filter((k) => !(k in SECONDARY_DELIVERY)).sort();
+  expect(report("Parity ledger(s) for undelivered surface(s):", orphan,
+    "Deliver the surface (add it to SECONDARY_DELIVERY) or remove the stray ledger.")).toBe("");
+});
+
+it("keys each ledger to its own surface", () => {
+  const mismatched = ledgered().filter((k) => PARITY_LEDGERS[k]?.surface !== k).sort();
+  expect(report("Ledger(s) whose `surface` disagrees with their key:", mismatched)).toBe("");
+});
+```
+
+Pin the schema itself with unit tests that assert each disposition's refinement *fires* — a `ported` row carrying a `tracking` ref must fail to parse, a `deferred` row present on both sides must fail, and so on. And pin your one known dropped behavior as a checked-in `deferred` row plus a test asserting its presence and tracking, so the bug that motivated the ledger can never silently vanish from it. That is the parser-self-test discipline of recipe 10 applied to the thing the ledger exists to catch.
+
+**The general lesson:** a presence check and a behavior check are different granularities, and the coarse one reads as reassurance for the fine one it cannot see — "the surface is there" gets heard as "the surface works." When you port across platforms, enumerate from the source of truth and check the target; a target-first audit is structurally blind to what the target is missing. And bind the coverage to the delivery map, not to a hand-maintained list, so the harness stays dormant until a second platform exists and enrolls each port automatically thereafter.
+
+---
+
 ## Adding a recipe
 
 If you build a guard in a forked project that would help someone on a different stack, add it here in the same shape: **what it applies to, the failure it catches, why nothing else caught it, the code, and the general lesson underneath.** The last part is the most portable — a reader on another stack cannot use your `awk`, but they can use the reason you needed it.
