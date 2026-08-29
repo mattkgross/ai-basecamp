@@ -27,6 +27,7 @@ A pattern without a *Don't use when* becomes a rule someone applies where it doe
 | Error handling & debugging (fail loud, diagnosis before fix) | [errors.md](errors.md) |
 | Quality & process (comments, testing, dependencies, pre-PR gate) | [quality.md](quality.md) |
 | Anti-patterns (what not to do, and what it cost to learn) | [anti-patterns.md](anti-patterns.md) |
+| Platform parity (keeping a surface behavior-faithful when ported to a second platform) | [platform-parity.md](platform-parity.md) |
 
 *Add a slice when a domain accumulates enough entries to be worth its own file — data access, frontend conventions, API contracts, type safety, AI features, whatever your stack accretes. Add the row here so the slice is reachable.*
 
